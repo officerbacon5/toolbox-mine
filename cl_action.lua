@@ -47,14 +47,16 @@ end
 	variable data. 
 ------------------------------------------------------------------------]]--
 RegisterNUICallback( "ButtonClick", function( data, cb ) 
-	if ( data == "toggle cuff" ) then 
-		TriggerEvent( "Toggle cuff" )
-	elseif ( data == "button2" ) then 
-		chatPrint( "Button 2 pressed!" )
-	elseif ( data == "button3" ) then 
-		chatPrint( "Button 3 pressed!" )
+	if ( data == "handsup" ) then 
+		handsUp()
 	elseif ( data == "kneel" ) then 
-		TriggerEvent( "Kneelhu" )
+		TriggerEvent( "KneelHU" )
+	elseif ( data == "dropweapon" ) then 
+		TriggerEvent( "dropweapon" )
+		elseif ( data == "trunk" ) then 
+		TriggerEvent( "openTrunk" )
+	elseif ( data == "rollwindow" ) then 
+		TriggerEvent( "RollWindow" )
 	elseif ( data == "exit" ) then 
 		-- We toggle the ActionMenu and return here, otherwise the function 
 		-- call below would be executed too, which would just open the menu again 
@@ -103,10 +105,26 @@ function chatPrint( msg )
 	TriggerEvent( 'chatMessage', "ActionMenu", { 255, 255, 255 }, msg )
 end 
 
+local handsup = false
 
+function handsUp()
+    local dict = "missminuteman_1ig_2"
+    
+	RequestAnimDict(dict)
+	while not HasAnimDictLoaded(dict) do
+		Citizen.Wait(0)
+	end
+	if not handsup then
+		TaskPlayAnim(GetPlayerPed(-1), dict, "handsup_enter", 8.0, 8.0, -1, 50, 0, false, false, false)
+		handsup = true
+	else
+		handsup = false
+		ClearPedTasks(GetPlayerPed(-1))
+	end
+end
 
-
-
+--Kneel Handsup Start
+ 
 function loadAnimDict( dict )
     while ( not HasAnimDictLoaded( dict ) ) do
         RequestAnimDict( dict )
@@ -150,39 +168,60 @@ end)
 
 --Kneel Handsup End
 
-
-
--- client side handcuff script
-
-local handCuffed = false -- store wether we are handcuffed or not
-
-RegisterNetEvent('mHandCuff') -- register that this is a valid event
-
--- register a function to be called when we recieve the event
-AddEventHandler('mHandCuff', function()
-  -- set handCuffed equal to the oposite of its current value (true or false)
-  handCuffed = not handCuffed
+RegisterNetEvent("dropweapon")
+AddEventHandler('dropweapon', function()
+	local ped = GetPlayerPed(-1)
+	if DoesEntityExist(ped) and not IsEntityDead(ped) then
+		SetPedDropsWeapon(ped)
+		ShowNotification("~r~You have dropped your weapon.")
+	end
 end)
 
 
-Citizen.CreateThread(function() -- create a thread
-  while true do -- loop through this code infinitely
-    Citizen.Wait(1) -- required in an infinite loop or it will crash
+function ShowNotification(text)
+	SetNotificationTextEntry("STRING")
+	AddTextComponentString(text)
+	DrawNotification(false, false)
+end
 
-    if (handCuffed == true) then -- we are handcuffed
-      RequestAnimDict('mp_arresting') -- tell the game to load this animation dictionary
+RegisterNetEvent( 'openTrunk' )
+AddEventHandler( 'openTrunk', function()
 
-      -- check if the animation dictionary has loaded, if not, wait
-      while not HasAnimDictLoaded('mp_arresting') do
-        Citizen.Wait(0)
-      end
-
-      local myPed = PlayerPedId() -- get our ped identifier
-      local animation = 'idle' -- animation to play
-      local flags = 49 -- only play the animation on the upper body
-
-      -- play the animation
-      TaskPlayAnim(myPed, 'mp_arresting', animation, 8.0, -8, -1, flags, 0, 0, 0, 0)
+    local ped = PlayerPedId()
+    local veh = GetVehiclePedIsIn(ped, false)
+    if veh ~= nil and veh ~= 0 and veh ~= 1 then
+        if GetVehicleDoorAngleRatio(veh, 5) > 0 then
+            SetVehicleDoorShut(veh, 5, false)
+        else
+            SetVehicleDoorOpen(veh, 5, false, false)
+        end
     end
-  end
-end)
+end, false)
+
+local windowup = true
+RegisterNetEvent("RollWindow")
+AddEventHandler('RollWindow', function()
+    local playerPed = GetPlayerPed(-1)
+    if IsPedInAnyVehicle(playerPed, false) then
+        local playerCar = GetVehiclePedIsIn(playerPed, false)
+		if ( GetPedInVehicleSeat( playerCar, -1 ) == playerPed ) then 
+            SetEntityAsMissionEntity( playerCar, true, true )
+		
+			if ( windowup ) then
+				RollDownWindow(playerCar, 0)
+				RollDownWindow(playerCar, 1)
+				TriggerEvent('chatMessage', '', {255,0,0}, 'Windows down')
+				windowup = false
+			else
+				RollUpWindow(playerCar, 0)
+				RollUpWindow(playerCar, 1)
+				TriggerEvent('chatMessage', '', {255,0,0}, 'Windows up')
+				windowup = true
+			end
+		end
+	end
+end )
+
+RegisterCommand("rollw", function(source, args, raw)
+    TriggerEvent("RollWindow")
+end, false) --False, allow everyone to run it(thnx @Havoc)
